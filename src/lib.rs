@@ -31,18 +31,34 @@ impl<L, T> Graph<L, T>
 where
     L: PartialEq,
 {
-    pub fn get(&self, label: &L) -> anyhow::Result<&GraphRow<L, T>> {
+    fn get_graph_row(&self, label: &L) -> anyhow::Result<&GraphRow<L, T>> {
         let index = get_index(&self.labels, label)?;
         self.grid.get(index).ok_or(anyhow!(UNKNOWN_LABEL))
     }
 
+    fn get_mut_graph_row(&mut self, label: &L) -> anyhow::Result<&mut GraphRow<L, T>> {
+        let index = get_index(&self.labels, label)?;
+        self.grid.get_mut(index).ok_or(anyhow!(UNKNOWN_LABEL))
+    }
+
+    pub fn get(&self, begin: &L, end: &L) -> anyhow::Result<&Option<T>> {
+        let graph_row = self.get_graph_row(begin)?;
+        graph_row.get(end)
+    }
+
+    pub fn set(&mut self, begin: &L, end: &L, value: Option<T>) -> anyhow::Result<()> {
+        let graph_row = self.get_mut_graph_row(begin)?;
+        graph_row.set(end, value)
+    }
+
     pub fn get_connected_nodes(&self, label: &L) -> anyhow::Result<Vec<&L>> {
-        let graph_row: &GraphRow<L, T> = self.get(label)?;
+        
+        let graph_row: &GraphRow<L, T> = self.get_graph_row(label)?;
         graph_row.get_connected_nodes()
     }
 
     pub fn get_connected_nodes_and_path(&self, label: &L) -> anyhow::Result<Vec<(&L, &T)>> {
-        let graph_row: &GraphRow<L, T> = self.get(label)?;
+        let graph_row: &GraphRow<L, T> = self.get_graph_row(label)?;
         graph_row.get_connected_nodes_and_path()
     }
 
@@ -150,10 +166,10 @@ where
         self.row.get(index).ok_or(anyhow!(UNKNOWN_LABEL))
     }
 
-    pub fn set(&mut self, label: &L, value: T) -> anyhow::Result<()> {
+    pub fn set(&mut self, label: &L, value: Option<T>) -> anyhow::Result<()> {
         match get_index(&self.labels, label) {
             Ok(index) => {
-                self.row[index] = Some(value);
+                self.row[index] = value;
                 Ok(())
             }
             Err(e) => panic!("{e}"),
@@ -296,16 +312,9 @@ mod test_graph {
     fn test_get() {
         let graph: Graph<String, usize> = create_graph_wiki();
 
-        assert_eq!(
-            graph.get(&s!("3")).unwrap().get(&s!("6")).unwrap(),
-            &Some(2)
-        );
-        assert_eq!(
-            graph.get(&s!("2")).unwrap().get(&s!("4")).unwrap(),
-            &Some(15)
-        );
-        graph.get(&s!("abc")).unwrap().get(&s!("def")).unwrap(); // panic -> pas de node à ce nom.
-        graph.get(&s!("1")).unwrap().get(&s!("def")).unwrap(); // panic -> pas de node à ce nom.
+        assert_eq!(graph.get(&s!("3"), &s!("6")).unwrap(), &Some(2));
+        assert_eq!(graph.get(&s!("2"), &s!("4")).unwrap(), &Some(15));
+        graph.get(&s!("abc"), &s!("def")).unwrap(); // panic -> pas de node à ce nom.
 
         assert_eq!(graph[s!("1")][s!("2")], Some(7));
         assert_eq!(graph[s!("5")][s!("4")], Some(6));
@@ -314,7 +323,7 @@ mod test_graph {
 
     #[test]
     #[should_panic]
-    fn test_set() {
+    fn test_index_mut() {
         let mut graph: Graph<String, usize> = create_graph_wiki();
 
         graph[s!("1")][s!("2")] = Some(12);
@@ -322,6 +331,26 @@ mod test_graph {
         graph[s!("2")][s!("3")] = Some(42);
         assert_eq!(graph[s!("2")][s!("3")], Some(42));
         graph[s!("7")][s!("8")] = None; // panic -> pas de node à ce nom.
+    }
+
+    #[test]
+    fn test_set() {
+        let mut graph: Graph<String, usize> = create_graph_wiki();
+        
+        assert_eq!(
+            graph.set(&s!("1"), &s!("2"), Some(12)).unwrap(),
+            ()
+        );
+        assert_eq!(graph.get(&s!("1"), &s!("2")).unwrap(), &Some(12));
+        assert_eq!(
+            graph.set(&s!("2"), &s!("3"), Some(24)).unwrap(),
+            ()
+        );
+        assert_eq!(graph.get(&s!("2"), &s!("3")).unwrap(), &Some(24));
+        assert_eq!(
+            graph.set(&s!("7"), &s!("8"), None).is_err(),
+            true
+        );
     }
 
     #[test]
