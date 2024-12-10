@@ -61,22 +61,34 @@ where
         let graph_row: &GraphRow<L, T> = self.get_graph_row(label)?;
         graph_row.get_connected_nodes_and_path()
     }
+}
 
+impl<L, T> Graph<L, T>
+where
+    L: PartialEq,
+    T: Default,
+{
     pub fn dijkstra_shortest_path(&self, start: &L, _end: &L) -> anyhow::Result<Vec<&L>> {
-        // Liste des nodes déjà parcouru.
-        // Trouver la node la plus proche qui n'est pas dans liste
-        // ou qui est la node de fin.
-        // Si pas la node de fin, recommencer avec cette node.
-
-        let visited_nodes: Vec<&L> = vec![start];
-
-        let actual_node: &L = start;
-        let connected_nodes: Vec<&L> = self.get_connected_nodes(actual_node)?;
-        let _filtered_connected_nodes: Vec<&L> = connected_nodes
-            .into_iter()
-            .filter(|node| !visited_nodes.contains(node))
+        struct Node<'a, L, T> {
+            label: &'a L,
+            length: Option<T>,
+            path: Option<Vec<&'a L>>,
+        }
+        
+        let mut unvisited_nodes: Vec<Node<L, T>> = self.labels
+            .iter()
+            .map(|l| {
+                let length = if l.eq(start) {
+                    Some(T::default())
+                } else {
+                    None
+                };
+                Node { label: l, length, path: None }
+            })
             .collect();
-
+        
+        
+        
         todo!()
     }
 }
